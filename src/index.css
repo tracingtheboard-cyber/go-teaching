@@ -8,7 +8,7 @@
   --text-secondary: #a0a0a0;
   --glass-border: rgba(255, 255, 255, 0.1);
   --video-bg: #000000;
-  --sidebar-width: 320px;
+  --sidebar-width: 260px; /* Reduced from 320px */
 }
 
 * {
@@ -37,39 +37,42 @@ body {
 
 /* Sidebar Styling */
 .sidebar {
-  width: 300px;
+  width: var(--sidebar-width);
   background: var(--sidebar-bg);
   backdrop-filter: blur(12px);
   border-left: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 16px; /* Reduced from 24px */
+  gap: 16px; /* Reduced from 24px */
   z-index: 10;
+  overflow-y: auto;
 }
 
 .logo {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 800;
-  margin-bottom: 40px;
+  margin-bottom: 20px; /* Reduced from 40px */
   background: linear-gradient(45deg, #d4af37, #f9e29c);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
+  text-align: center;
 }
 
 /* Video Section */
 .video-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 12px;
+  margin-bottom: 16px; /* Reduced from 32px */
 }
 
 .video-slot {
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: 16/10; /* Flatter than 4/3 to save vertical space */
   background: var(--video-bg);
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
   position: relative;
   border: 1px solid var(--glass-border);
@@ -172,7 +175,7 @@ body {
 }
 
 .tool-group {
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .tool-label {
@@ -186,21 +189,21 @@ body {
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr); /* 3 columns for better fit */
+  gap: 8px;
 }
 
 .tool-button {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
   color: var(--text-primary);
-  padding: 12px;
-  border-radius: 12px;
+  padding: 8px; /* Reduced from 12px */
+  border-radius: 10px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
