@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play
+  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Lock, ShoppingCart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Peer from 'peerjs';
@@ -9,9 +8,9 @@ const BOARD_SIZE = 19;
 
 // Mock Courses Data
 const MOCK_COURSES = [
-  { id: 1, title: '星阵布局第一课：点三三的奥秘', duration: '12:45', views: '1.2k', thumb: 'https://images.unsplash.com/photo-1596515865261-26cce4280b2a?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-  { id: 2, title: '大川手筋精讲：金鸡独立与老鼠偷油', duration: '08:20', views: '856', thumb: 'https://images.unsplash.com/photo-1597510787352-0c9780517865?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-  { id: 3, title: '定式陷阱：如何破解骗着', duration: '15:30', views: '2.4k', thumb: 'https://images.unsplash.com/photo-1629851610477-7096e2bda36e?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
+  { id: 1, title: '星阵布局第一课：点三三的奥秘', duration: '12:45', views: '1.2k', isPremium: false, thumb: 'https://images.unsplash.com/photo-1596515865261-26cce4280b2a?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+  { id: 2, title: '大川手筋精讲：金鸡独立与老鼠偷油', duration: '28:20', views: '856', isPremium: true, price: '¥99', gumroadLink: 'https://gumroad.com/', thumb: 'https://images.unsplash.com/photo-1597510787352-0c9780517865?auto=format&fit=crop&q=80&w=600' },
+  { id: 3, title: '定式陷阱：如何破解各大骗着', duration: '45:30', views: '2.4k', isPremium: true, price: '¥199', gumroadLink: 'https://gumroad.com/', thumb: 'https://images.unsplash.com/photo-1629851610477-7096e2bda36e?auto=format&fit=crop&q=80&w=600' }
 ];
 
 const App = () => {
@@ -596,9 +595,16 @@ const App = () => {
                 <div key={course.id} className="course-card" onClick={() => setSelectedCourse(course)}>
                   <div className="course-thumb-container">
                     <img src={course.thumb} alt={course.title} className="course-thumb" />
+                    {course.isPremium && (
+                      <div className="premium-badge">
+                        <Lock size={12} /> PRO
+                      </div>
+                    )}
                     <div className="course-duration">{course.duration}</div>
                     <div className="play-overlay">
-                      <div className="play-icon"><Play size={24} fill="#000" /></div>
+                      <div className="play-icon">
+                        {course.isPremium ? <Lock size={24} fill="#000" /> : <Play size={24} fill="#000" />}
+                      </div>
                     </div>
                   </div>
                   <div className="course-info">
@@ -612,18 +618,36 @@ const App = () => {
         </div>
       )}
 
-      {/* Video Player Modal */}
+      {/* Video / Purchase Modal */}
       {selectedCourse && (
         <div className="video-modal-overlay" onClick={() => setSelectedCourse(null)}>
           <button className="video-modal-close" onClick={() => setSelectedCourse(null)}><X size={24} /></button>
+          
           <div className="video-modal-content" onClick={e => e.stopPropagation()}>
-            <video 
-              className="video-modal-player" 
-              src={selectedCourse.videoUrl} 
-              controls 
-              autoPlay 
-              playsInline
-            />
+            {selectedCourse.isPremium ? (
+              <div className="purchase-card">
+                <div className="purchase-header">
+                  <Lock size={48} color="#d4af37" style={{marginBottom: 20}} />
+                  <h2 style={{fontSize: '2rem', marginBottom: 10}}>{selectedCourse.title}</h2>
+                  <p style={{color: '#aaa', fontSize: '1.1rem', marginBottom: 30}}>这是一节付费精品课程，购买后即可永久解锁完整视频与配套棋谱。</p>
+                </div>
+                <div className="purchase-price">{selectedCourse.price}</div>
+                <button 
+                  className="buy-btn"
+                  onClick={() => window.open(selectedCourse.gumroadLink, '_blank')}
+                >
+                  <ShoppingCart size={20} /> 立即购买解锁
+                </button>
+              </div>
+            ) : (
+              <video 
+                className="video-modal-player" 
+                src={selectedCourse.videoUrl} 
+                controls 
+                autoPlay 
+                playsInline
+              />
+            )}
           </div>
         </div>
       )}
