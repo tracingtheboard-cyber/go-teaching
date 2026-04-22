@@ -36,6 +36,8 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isTeacher, setIsTeacher] = useState(true); // Default to teacher
+  const [canStudentPlay, setCanStudentPlay] = useState(false);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -117,6 +119,8 @@ const App = () => {
       setCurrentTurn(data.turn);
       setAnnotations(data.annotations);
       setMoveCount(data.moveCount || 0);
+    } else if (data.type === 'PERMISSION_UPDATE') {
+      setCanStudentPlay(data.canPlay);
     }
   };
 
@@ -269,6 +273,12 @@ const App = () => {
   };
 
   const handlePlaceStone = (x, y) => {
+    // Check permissions
+    if (!isTeacher && !canStudentPlay) {
+      alert("请等待老师开启落子权限");
+      return;
+    }
+
     const key = `${x},${y}`;
     
     // 如果是标记工具，执行自动标记逻辑
@@ -467,6 +477,12 @@ const App = () => {
         <div className="connection-overlay">
           <div className="connection-card">
             <h2>大川围棋互动教室</h2>
+            
+            <div className="role-selector" style={{display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 20}}>
+              <button className={`role-btn ${isTeacher ? 'active' : ''}`} onClick={() => setIsTeacher(true)}>我是老师</button>
+              <button className={`role-btn ${!isTeacher ? 'active' : ''}`} onClick={() => setIsTeacher(false)}>我是学生</button>
+            </div>
+
             <div className="id-display" onClick={() => {navigator.clipboard.writeText(myId); setCopied(true); setTimeout(() => setCopied(false), 2000);}}>
               {myId || '生成中...'} {copied ? <Check size={16}/> : <Copy size={16}/>}
             </div>
@@ -560,6 +576,23 @@ const App = () => {
 
       <aside className="sidebar">
         <div className="logo">大川围棋</div>
+        
+        {isTeacher && (
+          <div className="admin-controls" style={{padding: '10px', background: 'rgba(212,175,55,0.1)', borderRadius: 10, marginBottom: 15}}>
+            <label style={{display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '14px'}}>
+              <input 
+                type="checkbox" 
+                checked={canStudentPlay} 
+                onChange={(e) => {
+                  setCanStudentPlay(e.target.checked);
+                  sendData({ type: 'PERMISSION_UPDATE', canPlay: e.target.checked });
+                }} 
+              />
+              允许学生落子
+            </label>
+          </div>
+        )}
+
         <div className="video-container">
           <div className="video-slot">
             <video ref={localVideoRef} autoPlay muted playsInline />
@@ -578,48 +611,54 @@ const App = () => {
             <div className="video-label">学生</div>
           </div>
         </div>
-        <div className="tool-group">
-          <span className="tool-label">工具箱</span>
-          <div className="tool-grid">
-            <button className={`tool-button ${activeTool === 'stone' ? 'active' : ''}`} onClick={() => setActiveTool('stone')}><Hand size={20}/></button>
-            <button className={`tool-button ${activeTool === 'pen' ? 'active' : ''}`} onClick={() => setActiveTool('pen')}><Pencil size={20}/></button>
-            <button className={`tool-button ${activeTool === 'circle' ? 'active' : ''}`} onClick={() => setActiveTool('circle')}><Circle size={20}/></button>
-            <button className={`tool-button ${activeTool === 'triangle' ? 'active' : ''}`} onClick={() => setActiveTool('triangle')}><Triangle size={20}/></button>
-            <button className={`tool-button ${activeTool === 'square' ? 'active' : ''}`} onClick={() => setActiveTool('square')}><Square size={20}/></button>
-            <button className={`tool-button ${activeTool === 'x' ? 'active' : ''}`} onClick={() => setActiveTool('x')}><X size={20}/></button>
-            <button className={`tool-button ${activeTool === 'number' ? 'active' : ''}`} onClick={() => setActiveTool('number')}><div style={{fontWeight: 'bold', fontSize: '18px'}}>#</div></button>
-            <button className={`tool-button ${showCoords ? 'active' : ''}`} onClick={() => setShowCoords(!showCoords)}><Info size={20}/></button>
-            <button className={`tool-button ${showMoveNumbers ? 'active' : ''}`} onClick={() => setShowMoveNumbers(!showMoveNumbers)}><div style={{fontWeight: 'bold', fontSize: '14px'}}>123</div></button>
-          </div>
-        </div>
+        {isTeacher && (
+          <>
+            <div className="tool-group">
+              <span className="tool-label">工具箱</span>
+              <div className="tool-grid">
+                <button className={`tool-button ${activeTool === 'stone' ? 'active' : ''}`} onClick={() => setActiveTool('stone')}><Hand size={20}/></button>
+                <button className={`tool-button ${activeTool === 'pen' ? 'active' : ''}`} onClick={() => setActiveTool('pen')}><Pencil size={20}/></button>
+                <button className={`tool-button ${activeTool === 'circle' ? 'active' : ''}`} onClick={() => setActiveTool('circle')}><Circle size={20}/></button>
+                <button className={`tool-button ${activeTool === 'triangle' ? 'active' : ''}`} onClick={() => setActiveTool('triangle')}><Triangle size={20}/></button>
+                <button className={`tool-button ${activeTool === 'square' ? 'active' : ''}`} onClick={() => setActiveTool('square')}><Square size={20}/></button>
+                <button className={`tool-button ${activeTool === 'x' ? 'active' : ''}`} onClick={() => setActiveTool('x')}><X size={20}/></button>
+                <button className={`tool-button ${activeTool === 'number' ? 'active' : ''}`} onClick={() => setActiveTool('number')}><div style={{fontWeight: 'bold', fontSize: '18px'}}>#</div></button>
+                <button className={`tool-button ${showCoords ? 'active' : ''}`} onClick={() => setShowCoords(!showCoords)}><Info size={20}/></button>
+                <button className={`tool-button ${showMoveNumbers ? 'active' : ''}`} onClick={() => setShowMoveNumbers(!showMoveNumbers)}><div style={{fontWeight: 'bold', fontSize: '14px'}}>123</div></button>
+              </div>
+            </div>
 
-        <div className="tool-group">
-          <span className="tool-label">调色盘</span>
-          <div style={{display: 'flex', gap: 12, padding: '10px 5px'}}>
-            {['#000000', '#ffffff', '#d4af37', '#ff4d4f', '#52c41a', '#1890ff'].map(color => (
-              <div 
-                key={color} 
-                onClick={() => setActiveColor(color)}
-                style={{
-                  width: 24, height: 24, borderRadius: '50%', background: color, cursor: 'pointer',
-                  border: activeColor === color ? '2px solid white' : '2px solid transparent',
-                  boxShadow: activeColor === color ? `0 0 8px ${color}` : 'none'
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        <button className="tool-button" style={{width: '100%', marginBottom: 8}} onClick={() => document.getElementById('sgf-input').click()}>
-          <FileUp size={18} /><span>导入棋谱 (SGF)</span>
-        </button>
-        <input type="file" id="sgf-input" accept=".sgf" style={{display: 'none'}} onChange={handleSGFUpload} />
-        
-        <button className="tool-button" style={{width: '100%', marginBottom: 8}} onClick={() => {setAnnotations([]); setMarkerCount(1); sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: [], moveCount });}}>
-          <Eraser size={18} /><span>擦除标记</span>
-        </button>
-        <button className="tool-button" style={{width: '100%'}} onClick={() => {setStones(new Map()); setAnnotations([]); setMoveCount(0); setMarkerCount(1); sendData({ type: 'SYNC', stones: '[]', turn: 'black', annotations: [], moveCount: 0 });}}>
-          <Trash2 size={18} /><span>清空棋盘</span>
-        </button>
+            <div className="tool-group">
+              <span className="tool-label">调色盘</span>
+              <div style={{display: 'flex', gap: 12, padding: '10px 5px'}}>
+                {['#000000', '#ffffff', '#d4af37', '#ff4d4f', '#52c41a', '#1890ff'].map(color => (
+                  <div 
+                    key={color} 
+                    onClick={() => setActiveColor(color)}
+                    style={{
+                      width: 24, height: 24, borderRadius: '50%', background: color, cursor: 'pointer',
+                      border: activeColor === color ? '2px solid white' : '2px solid transparent',
+                      boxShadow: activeColor === color ? `0 0 8px ${color}` : 'none'
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            <button className="tool-button" style={{width: '100%', marginBottom: 8}} onClick={() => document.getElementById('sgf-input').click()}>
+              <FileUp size={18} /><span>导入棋谱 (SGF)</span>
+            </button>
+            <input type="file" id="sgf-input" accept=".sgf" style={{display: 'none'}} onChange={handleSGFUpload} />
+            
+            <button className="tool-button" style={{width: '100%', marginBottom: 8}} onClick={() => {setAnnotations([]); setMarkerCount(1); sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: [], moveCount });}}>
+              <Eraser size={18} /><span>擦除标记</span>
+            </button>
+
+            <button className="tool-button" style={{width: '100%', background: 'rgba(255, 77, 79, 0.1)', color: '#ff4d4f'}} onClick={() => {setStones(new Map()); setAnnotations([]); setMoveCount(0); setMarkerCount(1); sendData({ type: 'SYNC', stones: '[]', turn: 'black', annotations: [], moveCount: 0 });}}>
+              <Trash2 size={18} /><span>清空棋盘</span>
+            </button>
+          </>
+        )}
       </aside>
     </div>
   );
