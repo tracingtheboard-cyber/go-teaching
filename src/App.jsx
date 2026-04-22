@@ -49,9 +49,21 @@ const App = () => {
   // Resize Handler
   useEffect(() => {
     const handleResize = () => {
-      const h = window.innerHeight - 120;
-      const w = window.innerWidth - 360;
-      setBoardPx(Math.max(300, Math.min(h, w)));
+      const isMobile = window.innerWidth <= 768;
+      let availableW, availableH;
+      
+      if (isMobile) {
+        // Mobile: Use full width with small padding
+        availableW = window.innerWidth - 32;
+        availableH = window.innerHeight * 0.6; // Max 60% of height
+      } else {
+        // Desktop: Subtract sidebar width
+        availableW = window.innerWidth - 300; 
+        availableH = window.innerHeight - 100;
+      }
+      
+      const size = Math.max(280, Math.min(availableW, availableH));
+      setBoardPx(size);
     };
     handleResize();
     window.addEventListener('resize', handleResize);

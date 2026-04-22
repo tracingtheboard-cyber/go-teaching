@@ -478,8 +478,6 @@ body {
   }
 
   .go-board-wrapper {
-    width: 92vw !important; /* Force width on mobile */
-    height: 92vw !important;
     margin: 0 auto;
   }
 
