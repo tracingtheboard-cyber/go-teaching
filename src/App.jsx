@@ -629,15 +629,26 @@ const App = () => {
                 <div className="purchase-header">
                   <Lock size={48} color="#d4af37" style={{marginBottom: 20}} />
                   <h2 style={{fontSize: '2rem', marginBottom: 10}}>{selectedCourse.title}</h2>
-                  <p style={{color: '#aaa', fontSize: '1.1rem', marginBottom: 30}}>这是一节付费精品课程，购买后即可永久解锁完整视频与配套棋谱。</p>
+                  <p style={{color: '#aaa', fontSize: '1.1rem', marginBottom: 20}}>这是一节付费精品课程，请使用 <strong>PayNow</strong> 扫码支付获取解锁密码。</p>
                 </div>
+                
                 <div className="purchase-price">{selectedCourse.price}</div>
-                <button 
-                  className="buy-btn"
-                  onClick={() => window.open(selectedCourse.gumroadLink, '_blank')}
-                >
-                  <ShoppingCart size={20} /> 立即购买解锁
-                </button>
+                
+                <div className="paynow-container">
+                  <div className="paynow-qr-placeholder">
+                    {/* 等你有了真实的二维码图片，把下面这行注释取消，并把图片命名为 paynow.png 放在 public 文件夹下 */}
+                    {/* <img src="/paynow.png" alt="PayNow" style={{width: '100%', height: '100%', objectFit: 'contain'}} /> */}
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%'}}>
+                      <span style={{fontSize: '24px', fontWeight: 'bold', color: '#fff', letterSpacing: 2}}>PayNow</span>
+                      <p style={{fontSize: '12px', marginTop: 10, color: '#aaa'}}>请将真实二维码命名为 public/paynow.png</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{marginTop: 30, color: '#888', fontSize: '0.95rem', lineHeight: 1.5, background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px'}}>
+                  💡 支付成功后，请将转账截图发送至大川老师 WhatsApp (或微信)<br/>
+                  老师确认后将立即发送课程密码及配套棋谱。
+                </div>
               </div>
             ) : (
               <video 
