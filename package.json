@@ -1,0 +1,20 @@
+{
+  "name": "go teaching",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.8.0",
+    "peerjs": "^1.5.5",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "vite": "^8.0.9",
+    "vite-plugin-react": "^4.0.0"
+  }
+}
