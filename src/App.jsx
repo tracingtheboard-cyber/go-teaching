@@ -24,6 +24,7 @@ const App = () => {
   const [sgfMoves, setSgfMoves] = useState([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [activeColor, setActiveColor] = useState('#d4af37'); // Default gold
+  const boardRef = useRef(null);
   
   // --- Peer & Media State ---
   const [peer, setPeer] = useState(null);
@@ -284,75 +285,94 @@ const App = () => {
     }, 500);
   };
 
-  const handlePlaceStone = (x, y) => {
+  const handleBoardInteraction = (e) => {
     // Check permissions
     if (!isTeacher && !canStudentPlay) {
       alert("请等待老师开启落子权限");
       return;
     }
 
+    const rect = boardRef.current.getBoundingClientRect();
+    const clientX = (e.clientX || (e.touches && e.touches[0]?.clientX));
+    const clientY = (e.clientY || (e.touches && e.touches[0]?.clientY));
+    
+    if (clientX === undefined || clientY === undefined) return;
+
+    const xPx = clientX - rect.left;
+    const yPx = clientY - rect.top;
+    
+    // Calculate nearest grid point (0 to 18)
+    const x = Math.round(xPx / cellSize - 0.5);
+    const y = Math.round(yPx / cellSize - 0.5);
+    
+    if (x < 0 || x > 18 || y < 0 || y > 18) return;
+
     const key = `${x},${y}`;
     
-    // 如果是标记工具，执行自动标记逻辑
-    if (['circle', 'triangle', 'square', 'x'].includes(activeTool)) {
-      const px = cellSize * (x + 0.5);
-      const py = cellSize * (y + 0.5);
-      const r = cellSize * 0.3; // 固定大小
-      
-      const newAnno = { 
-        tool: activeTool, 
-        points: [[px, py], [px + r, py]], // 模拟两点以复用现有的绘图逻辑，或者之后重写绘图
-        grid: {x, y},
-        color: '#d4af37' 
-      };
-      
-      const newAnnos = [...annotations, newAnno];
-      setAnnotations(newAnnos);
-      sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
-      return;
-    }
-
-    if (stones.has(key)) return;
-
-    const newStones = new Map(stones);
-    const newMoveCount = moveCount + 1;
-    newStones.set(key, { color: currentTurn, moveNumber: newMoveCount });
-
-    // Capture Logic
-    const opponent = currentTurn === 'black' ? 'white' : 'black';
-    let capturedAny = false;
-    getNeighbors(x, y).forEach(([nx, ny]) => {
-      const nk = `${nx},${ny}`;
-      if (newStones.get(nk)?.color === opponent) {
-        const group = getGroup(nx, ny, opponent, newStones);
-        if (getLiberties(group, newStones).size === 0) {
-          group.forEach(gk => newStones.delete(gk));
-          capturedAny = true;
-        }
+    // Logic for Markers (Triangle, Square, etc.)
+    if (['circle', 'triangle', 'square', 'x', 'number'].includes(activeTool)) {
+      const existingMarker = annotations.find(a => a.grid && a.grid.x === x && a.grid.y === y && a.tool === activeTool);
+      if (existingMarker) {
+        const newAnnos = annotations.filter(a => a !== existingMarker);
+        setAnnotations(newAnnos);
+        sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
+      } else {
+        const newMark = { 
+          tool: activeTool, 
+          grid: {x, y},
+          label: activeTool === 'number' ? markerCount : null,
+          color: activeColor 
+        };
+        if (activeTool === 'number') setMarkerCount(prev => prev + 1);
+        const newAnnos = [...annotations, newMark];
+        setAnnotations(newAnnos);
+        sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
       }
-    });
-
-    // Suicide Check
-    const group = getGroup(x, y, currentTurn, newStones);
-    if (getLiberties(group, newStones).size === 0 && !capturedAny) {
-      console.warn("Invalid move: Suicide");
       return;
     }
 
-    // Success! 
-    playStoneSound();
-    setHistory([...history, new Map(stones)]);
-    setStones(newStones);
-    setMoveCount(newMoveCount);
-    const nextTurn = opponent;
-    setCurrentTurn(nextTurn);
+    // Logic for Stones
+    if (activeTool === 'stone') {
+      if (stones.has(key)) return;
 
-    sendData({
-      type: 'MOVE',
-      stones: JSON.stringify(Array.from(newStones.entries())),
-      turn: nextTurn,
-      moveCount: newMoveCount
-    });
+      const newStones = new Map(stones);
+      const moveNum = moveCount + 1;
+      newStones.set(key, { color: currentTurn, moveNumber: moveNum });
+
+      // Captures
+      const opponent = currentTurn === 'black' ? 'white' : 'black';
+      let capturedCount = 0;
+      getNeighbors(x, y).forEach(([nx, ny]) => {
+        const nk = `${nx},${ny}`;
+        if (newStones.get(nk)?.color === opponent) {
+          const group = getGroup(nx, ny, opponent, newStones);
+          if (getLiberties(group, newStones).size === 0) {
+            capturedCount += group.size;
+            group.forEach(gk => newStones.delete(gk));
+          }
+        }
+      });
+
+      // Suicide check
+      const selfGroup = getGroup(x, y, currentTurn, newStones);
+      if (getLiberties(selfGroup, newStones).size === 0 && capturedCount === 0) {
+        alert("禁止自杀！");
+        return;
+      }
+
+      playStoneSound();
+      setStones(newStones);
+      setMoveCount(moveNum);
+      const nextTurn = currentTurn === 'black' ? 'white' : 'black';
+      setCurrentTurn(nextTurn);
+
+      sendData({ 
+        type: 'MOVE', 
+        stones: JSON.stringify(Array.from(newStones.entries())), 
+        turn: nextTurn,
+        moveCount: moveNum
+      });
+    }
   };
 
   // Drawing
@@ -508,7 +528,13 @@ const App = () => {
       )}
 
       <main className="main-content">
-        <div className="go-board-wrapper" style={{ width: boardPx, height: boardPx, '--cell-size': `${cellSize}px` }}>
+        <div 
+          ref={boardRef}
+          className="go-board-wrapper" 
+          onClick={handleBoardInteraction}
+          onTouchStart={handleBoardInteraction}
+          style={{ width: boardPx, height: boardPx, '--cell-size': `${cellSize}px`, position: 'relative' }}
+        >
           {showCoords && Array.from({length: 19}).map((_, i) => (
             <React.Fragment key={i}>
               <div className="coord-label" style={{ top: -20, left: cellSize * (i + 0.5), transform: 'translateX(-50%)' }}>{String.fromCharCode(65 + (i >= 8 ? i + 1 : i))}</div>
@@ -517,36 +543,51 @@ const App = () => {
               <div className="coord-label" style={{ right: -20, top: cellSize * (i + 0.5), transform: 'translateY(-50%)' }}>{19 - i}</div>
             </React.Fragment>
           ))}
-          <div className="go-board" style={{ gridTemplateColumns: `repeat(19, 1fr)`, width: '100%', height: '100%' }}>
-            {Array.from({length: 19}).map((_, i) => (
-              <React.Fragment key={i}>
-                <div className="grid-line" style={{ top: cellSize * (i + 0.5), left: cellSize * 0.5, width: cellSize * 18, height: 1 }} />
-                <div className="grid-line" style={{ left: cellSize * (i + 0.5), top: cellSize * 0.5, height: cellSize * 18, width: 1 }} />
-              </React.Fragment>
-            ))}
-            {[3, 9, 15].map(x => [3, 9, 15].map(y => <div key={`${x}-${y}`} className="star-point" style={{ left: cellSize * (x + 0.5), top: cellSize * (y + 0.5) }} />))}
-            {Array.from({length: 19 * 19}).map((_, i) => {
-              const x = i % 19; const y = Math.floor(i / 19); const stone = stones.get(`${x},${y}`);
-              return (
-                <div key={i} className="board-cell" onClick={() => handlePlaceStone(x, y)}>
-                  <AnimatePresence>
-                    {stone && (
-                      <motion.div 
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                        className={`stone ${stone.color}`}
-                      >
-                        {showMoveNumbers && <div className="move-number">{stone.moveNumber}</div>}
-                        {stone.moveNumber === moveCount && !showMoveNumbers && <div className="last-move-marker" />}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </div>
+          
+          {/* Grid Lines */}
+          {Array.from({length: 19}).map((_, i) => (
+            <React.Fragment key={i}>
+              <div className="grid-line" style={{ top: cellSize * (i + 0.5), left: cellSize * 0.5, width: cellSize * 18, height: 1 }} />
+              <div className="grid-line" style={{ left: cellSize * (i + 0.5), top: cellSize * 0.5, height: cellSize * 18, width: 1 }} />
+            </React.Fragment>
+          ))}
+          
+          {/* Star Points */}
+          {[3, 9, 15].map(x => [3, 9, 15].map(y => <div key={`${x}-${y}`} className="star-point" style={{ left: cellSize * (x + 0.5), top: cellSize * (y + 0.5) }} />))}
+          
+          {/* Stones */}
+          {Array.from(stones.entries()).map(([key, stone]) => {
+            const [x, y] = key.split(',').map(Number);
+            return (
+              <div 
+                key={key} 
+                style={{
+                  position: 'absolute',
+                  left: cellSize * (x + 0.5),
+                  top: cellSize * (y + 0.5),
+                  width: cellSize,
+                  height: cellSize,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 2,
+                  pointerEvents: 'none'
+                }}
+              >
+                <AnimatePresence>
+                  <motion.div 
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    className={`stone ${stone.color}`}
+                  >
+                    {showMoveNumbers && <div className="move-number">{stone.moveNumber}</div>}
+                    {stone.moveNumber === moveCount && !showMoveNumbers && <div className="last-move-marker" />}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            );
+          })}
+
           <canvas 
             ref={canvasRef} 
             className={`drawing-layer ${activeTool !== 'stone' ? 'active' : ''}`} 
