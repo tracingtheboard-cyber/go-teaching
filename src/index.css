@@ -452,3 +452,58 @@ body {
 .nav-btn:active {
   transform: scale(0.95);
 }
+
+/* Mobile Responsive Layout (Phones) */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--glass-border);
+    padding: 16px;
+    height: auto;
+    order: 2; /* Sidebar at bottom */
+  }
+
+  .main-content {
+    width: 100%;
+    height: auto;
+    min-height: 100vw; /* Keep board visible */
+    padding: 20px;
+    order: 1; /* Board at top */
+  }
+
+  .go-board-wrapper {
+    width: 92vw !important; /* Force width on mobile */
+    height: 92vw !important;
+    margin: 0 auto;
+  }
+
+  .video-container {
+    flex-direction: row; /* Side by side on mobile */
+    gap: 8px;
+  }
+
+  .video-slot {
+    aspect-ratio: 1; /* Square videos to save space */
+  }
+
+  .logo {
+    display: none; /* Hide logo on small mobile to save space */
+  }
+
+  .sgf-controls {
+    position: relative;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    min-width: 0;
+    margin-top: 20px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
