@@ -484,10 +484,18 @@ body {
   .video-container {
     flex-direction: row; /* Side by side on mobile */
     gap: 8px;
+    justify-content: center;
+    margin-bottom: 12px;
   }
 
   .video-slot {
-    aspect-ratio: 1; /* Square videos to save space */
+    width: 120px !important; /* Smaller size for mobile */
+    aspect-ratio: 4/3;
+    border-radius: 8px;
+  }
+
+  .video-slot:nth-child(2) {
+    display: none; /* Hide student video on mobile as requested */
   }
 
   .logo {
