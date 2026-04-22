@@ -1,5 +1,6 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Lock, ShoppingCart
+  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Peer from 'peerjs';
