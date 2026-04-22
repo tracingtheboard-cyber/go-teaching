@@ -82,22 +82,48 @@ body {
   object-fit: cover;
 }
 
-.video-label {
+.video-controls {
   position: absolute;
   bottom: 8px;
-  left: 8px;
-  background: rgba(0,0,0,0.5);
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+
+.control-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
   backdrop-filter: blur(4px);
+}
+
+.control-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+.control-btn.off {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+}
+
+.video-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.5);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 10px;
-  color: white;
-  z-index: 2;
-}
-
-.video-controls {
-  position: absolute;
-  top: 8px;
   right: 8px;
   display: flex;
   gap: 4px;

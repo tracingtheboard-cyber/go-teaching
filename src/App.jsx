@@ -34,6 +34,8 @@ const App = () => {
   const [remoteStream, setRemoteStream] = useState(null);
   const [isJoined, setIsJoined] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isVideoOn, setIsVideoOn] = useState(true);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -138,6 +140,20 @@ const App = () => {
       console.error("Connect media error:", err);
       setIsJoined(true);
     });
+  };
+
+  const toggleMic = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => track.enabled = !isMicOn);
+      setIsMicOn(!isMicOn);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => track.enabled = !isVideoOn);
+      setIsVideoOn(!isVideoOn);
+    }
   };
 
   // --- SGF Parsing ---
@@ -450,7 +466,7 @@ const App = () => {
       {!isJoined && !remoteStream && (
         <div className="connection-overlay">
           <div className="connection-card">
-            <h2>星阵互动教室</h2>
+            <h2>大川围棋互动教室</h2>
             <div className="id-display" onClick={() => {navigator.clipboard.writeText(myId); setCopied(true); setTimeout(() => setCopied(false), 2000);}}>
               {myId || '生成中...'} {copied ? <Check size={16}/> : <Copy size={16}/>}
             </div>
@@ -543,10 +559,24 @@ const App = () => {
       </main>
 
       <aside className="sidebar">
-        <div className="logo">ANTIGRAVITY GO</div>
+        <div className="logo">大川围棋</div>
         <div className="video-container">
-          <div className="video-slot"><video ref={localVideoRef} autoPlay muted playsInline /><div className="video-label">老师</div></div>
-          <div className="video-slot">{remoteStream ? <video ref={remoteVideoRef} autoPlay playsInline /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333'}}>等待学生...</div>}<div className="video-label">学生</div></div>
+          <div className="video-slot">
+            <video ref={localVideoRef} autoPlay muted playsInline />
+            <div className="video-label">老师</div>
+            <div className="video-controls">
+              <button onClick={toggleMic} className={`control-btn ${!isMicOn ? 'off' : ''}`}>
+                {isMicOn ? <Mic size={16}/> : <MicOff size={16}/>}
+              </button>
+              <button onClick={toggleVideo} className={`control-btn ${!isVideoOn ? 'off' : ''}`}>
+                {isVideoOn ? <Video size={16}/> : <VideoOff size={16}/>}
+              </button>
+            </div>
+          </div>
+          <div className="video-slot">
+            {remoteStream ? <video ref={remoteVideoRef} autoPlay playsInline /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333'}}>等待学生...</div>}
+            <div className="video-label">学生</div>
+          </div>
         </div>
         <div className="tool-group">
           <span className="tool-label">工具箱</span>
