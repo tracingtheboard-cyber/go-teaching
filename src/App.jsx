@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  Hand, Pencil, Circle, Square, Type, Trash2, Undo2, Redo2, Settings, Share2, Video, Mic, MicOff, VideoOff, Copy, Check, Info, Triangle, X, Eraser, FileUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Peer from 'peerjs';
 
 const BOARD_SIZE = 19;
+
+// Mock Courses Data
+const MOCK_COURSES = [
+  { id: 1, title: '星阵布局第一课：点三三的奥秘', duration: '12:45', views: '1.2k', thumb: 'https://images.unsplash.com/photo-1596515865261-26cce4280b2a?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+  { id: 2, title: '大川手筋精讲：金鸡独立与老鼠偷油', duration: '08:20', views: '856', thumb: 'https://images.unsplash.com/photo-1597510787352-0c9780517865?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+  { id: 3, title: '定式陷阱：如何破解骗着', duration: '15:30', views: '2.4k', thumb: 'https://images.unsplash.com/photo-1629851610477-7096e2bda36e?auto=format&fit=crop&q=80&w=600', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
+];
 
 const App = () => {
   const [boardPx, setBoardPx] = useState(600);
@@ -37,15 +44,19 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
   const [isTeacher, setIsTeacher] = useState(true); // Default to teacher
   const [canStudentPlay, setCanStudentPlay] = useState(false);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const canvasRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState(null);
   const stoneAudioRef = useRef(new Audio('/落子音.m4a'));
+  const [selectedCourse, setSelectedCourse] = useState(null);
 
   // Resize Handler
   useEffect(() => {
@@ -170,6 +181,58 @@ const App = () => {
     if (localStream) {
       localStream.getVideoTracks().forEach(track => track.enabled = !isVideoOn);
       setIsVideoOn(!isVideoOn);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      // 1. Capture screen/window
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always" },
+        audio: false // We will combine with mic audio
+      });
+
+      // 2. Capture mic audio
+      const voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // 3. Mix tracks
+      const tracks = [...screenStream.getVideoTracks(), ...voiceStream.getAudioTracks()];
+      const combinedStream = new MediaStream(tracks);
+
+      recordedChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(combinedStream, {
+        mimeType: 'video/webm;codecs=vp9,opus'
+      });
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `大川围棋教学-${new Date().toLocaleString()}.webm`;
+        a.click();
+        
+        // Stop all tracks
+        combinedStream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Recording error:", err);
+      alert("无法启动录制，请确保已授予屏幕和麦克风权限。");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
   };
 
@@ -520,9 +583,47 @@ const App = () => {
             </div>
             <div style={{display: 'flex', gap: 10}}>
               <input type="text" placeholder="学生 ID" value={remoteId} onChange={e => setRemoteId(e.target.value)} style={{flex: 1, padding: 10, background: '#111', color: 'white', borderRadius: 8, border: '1px solid #333'}} />
-              <button onClick={connectToPeer} style={{padding: '0 20px', background: '#d4af37', border: 'none', borderRadius: 8, cursor: 'pointer'}}>进入</button>
+              <button onClick={connectToPeer} style={{padding: '0 20px', background: '#d4af37', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold'}}>进入</button>
             </div>
-            <button onClick={() => setIsJoined(true)} style={{marginTop: 20, background: 'none', border: 'none', color: '#666', cursor: 'pointer'}}>离线模式</button>
+            <button onClick={() => setIsJoined(true)} style={{marginTop: 20, background: 'none', border: 'none', color: '#666', cursor: 'pointer'}}>离线模式 (自己打谱)</button>
+          </div>
+
+          {/* Course Gallery Section */}
+          <div className="course-gallery">
+            <h2 className="gallery-title"><Video size={24} color="#d4af37" /> 精品公开课</h2>
+            <div className="course-grid">
+              {MOCK_COURSES.map(course => (
+                <div key={course.id} className="course-card" onClick={() => setSelectedCourse(course)}>
+                  <div className="course-thumb-container">
+                    <img src={course.thumb} alt={course.title} className="course-thumb" />
+                    <div className="course-duration">{course.duration}</div>
+                    <div className="play-overlay">
+                      <div className="play-icon"><Play size={24} fill="#000" /></div>
+                    </div>
+                  </div>
+                  <div className="course-info">
+                    <h3 className="course-title">{course.title}</h3>
+                    <div className="course-meta">{course.views} 次观看 • 大川老师</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Player Modal */}
+      {selectedCourse && (
+        <div className="video-modal-overlay" onClick={() => setSelectedCourse(null)}>
+          <button className="video-modal-close" onClick={() => setSelectedCourse(null)}><X size={24} /></button>
+          <div className="video-modal-content" onClick={e => e.stopPropagation()}>
+            <video 
+              className="video-modal-player" 
+              src={selectedCourse.videoUrl} 
+              controls 
+              autoPlay 
+              playsInline
+            />
           </div>
         </div>
       )}
@@ -628,10 +729,13 @@ const App = () => {
       </main>
 
       <aside className="sidebar">
-        <div className="logo">大川围棋</div>
+        <div className="logo">
+          大川围棋
+          {isRecording && <div className="rec-indicator" title="正在录制" />}
+        </div>
         
         {isTeacher && (
-          <div className="admin-controls" style={{padding: '10px', background: 'rgba(212,175,55,0.1)', borderRadius: 10, marginBottom: 15}}>
+          <div className="admin-controls" style={{padding: '10px', background: 'rgba(212,175,55,0.1)', borderRadius: 10, marginBottom: 15, display: 'flex', flexDirection: 'column', gap: 10}}>
             <label style={{display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '14px'}}>
               <input 
                 type="checkbox" 
@@ -643,6 +747,30 @@ const App = () => {
               />
               允许学生落子
             </label>
+            
+            <button 
+              className={`record-btn ${isRecording ? 'recording' : ''}`}
+              onClick={isRecording ? stopRecording : startRecording}
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '8px',
+                border: 'none',
+                background: isRecording ? '#ff4d4f' : 'rgba(255,255,255,0.1)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                fontSize: '13px',
+                fontWeight: 'bold',
+                transition: 'all 0.3s'
+              }}
+            >
+              <div style={{width: 10, height: 10, borderRadius: '50%', background: isRecording ? '#fff' : '#ff4d4f', animation: isRecording ? 'pulse 1s infinite' : 'none'}} />
+              {isRecording ? '停止录制' : '开始录课'}
+            </button>
           </div>
         )}
 
