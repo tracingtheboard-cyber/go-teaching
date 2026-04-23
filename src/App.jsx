@@ -348,7 +348,18 @@ const App = () => {
     }, 500);
   };
 
+  const lastInteractTime = useRef(0);
+
   const handleBoardInteraction = (e) => {
+    // Guard against double-firing (common with mixed touch/mouse events)
+    const now = Date.now();
+    if (now - lastInteractTime.current < 200) return;
+    lastInteractTime.current = now;
+
+    // Pointer events handle both mouse and touch in a unified way.
+    // We want to allow left click (0) and middle click (1).
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+    
     // Check permissions
     if (!isTeacher && !canStudentPlay) {
       alert("请等待老师开启落子权限");
@@ -356,8 +367,8 @@ const App = () => {
     }
 
     const rect = boardRef.current.getBoundingClientRect();
-    const clientX = (e.clientX || (e.touches && e.touches[0]?.clientX));
-    const clientY = (e.clientY || (e.touches && e.touches[0]?.clientY));
+    const clientX = e.clientX;
+    const clientY = e.clientY;
     
     if (clientX === undefined || clientY === undefined) return;
 
@@ -375,11 +386,13 @@ const App = () => {
     // Logic for Markers (Triangle, Square, etc.)
     if (['circle', 'triangle', 'square', 'x', 'number'].includes(activeTool)) {
       const existingMarker = annotations.find(a => a.grid && a.grid.x === x && a.grid.y === y && a.tool === activeTool);
+      
+      let newAnnos;
       if (existingMarker) {
-        const newAnnos = annotations.filter(a => a !== existingMarker);
-        setAnnotations(newAnnos);
-        sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
+        // Toggle off
+        newAnnos = annotations.filter(a => a !== existingMarker);
       } else {
+        // Add new marker
         const newMark = { 
           tool: activeTool, 
           grid: {x, y},
@@ -387,16 +400,26 @@ const App = () => {
           color: activeColor 
         };
         if (activeTool === 'number') setMarkerCount(prev => prev + 1);
-        const newAnnos = [...annotations, newMark];
-        setAnnotations(newAnnos);
-        sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
+        newAnnos = [...annotations, newMark];
       }
+      
+      setAnnotations(newAnnos);
+      sendData({ 
+        type: 'SYNC', 
+        stones: JSON.stringify(Array.from(stones.entries())), 
+        turn: currentTurn, 
+        annotations: newAnnos, 
+        moveCount 
+      });
       return;
     }
 
     // Logic for Stones
     if (activeTool === 'stone') {
-      if (stones.has(key)) return;
+      if (stones.has(key)) {
+        // Optional: Toggle stones off if teacher? (For now just return)
+        return;
+      }
 
       const newStones = new Map(stones);
       const moveNum = moveCount + 1;
@@ -440,31 +463,17 @@ const App = () => {
 
   // Drawing
   const startDrawing = (e) => {
+    // Only handle free-hand drawing logic here. 
+    // Grid markers are handled by handleBoardInteraction.
+    if (activeTool !== 'pen') return;
+
     const rect = canvasRef.current.getBoundingClientRect();
-    const rawX = e.clientX - rect.left;
-    const rawY = e.clientY - rect.top;
+    const clientX = (e.clientX || (e.touches && e.touches[0]?.clientX));
+    const clientY = (e.clientY || (e.touches && e.touches[0]?.clientY));
 
-    // 如果是标记工具，直接进行网格对齐的一键标记
-    if (['circle', 'triangle', 'square', 'x', 'number'].includes(activeTool)) {
-      const x = Math.floor(rawX / cellSize);
-      const y = Math.floor(rawY / cellSize);
-      
-      const newAnno = { 
-        tool: activeTool, 
-        grid: {x, y},
-        label: activeTool === 'number' ? markerCount : null,
-        color: activeColor 
-      };
-      
-      if (activeTool === 'number') setMarkerCount(prev => prev + 1);
-      
-      const newAnnos = [...annotations, newAnno];
-      setAnnotations(newAnnos);
-      sendData({ type: 'SYNC', stones: JSON.stringify(Array.from(stones.entries())), turn: currentTurn, annotations: newAnnos, moveCount });
-      return;
-    }
+    const rawX = clientX - rect.left;
+    const rawY = clientY - rect.top;
 
-    if (activeTool === 'stone') return;
     setIsDrawing(true);
     setCurrentPath({ tool: activeTool, points: [[rawX, rawY]], color: activeColor });
   };
@@ -582,7 +591,13 @@ const App = () => {
               {myId || '生成中...'} {copied ? <Check size={16}/> : <Copy size={16}/>}
             </div>
             <div style={{display: 'flex', gap: 10}}>
-              <input type="text" placeholder="学生 ID" value={remoteId} onChange={e => setRemoteId(e.target.value)} style={{flex: 1, padding: 10, background: '#111', color: 'white', borderRadius: 8, border: '1px solid #333'}} />
+              <input 
+                type="text" 
+                placeholder={isTeacher ? "输入学生 ID" : "输入老师 ID"} 
+                value={remoteId} 
+                onChange={e => setRemoteId(e.target.value)} 
+                style={{flex: 1, padding: 10, background: '#111', color: 'white', borderRadius: 8, border: '1px solid #333'}} 
+              />
               <button onClick={connectToPeer} style={{padding: '0 20px', background: '#d4af37', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold'}}>进入</button>
             </div>
             <button onClick={() => setIsJoined(true)} style={{marginTop: 20, background: 'none', border: 'none', color: '#666', cursor: 'pointer'}}>离线模式 (自己打谱)</button>
@@ -668,8 +683,7 @@ const App = () => {
         <div 
           ref={boardRef}
           className="go-board-wrapper" 
-          onClick={handleBoardInteraction}
-          onTouchStart={handleBoardInteraction}
+          onPointerDown={handleBoardInteraction}
           style={{ width: boardPx, height: boardPx, '--cell-size': `${cellSize}px`, position: 'relative' }}
         >
           {showCoords && Array.from({length: 19}).map((_, i) => (
@@ -727,7 +741,7 @@ const App = () => {
 
           <canvas 
             ref={canvasRef} 
-            className={`drawing-layer ${activeTool !== 'stone' ? 'active' : ''}`} 
+            className={`drawing-layer ${activeTool === 'pen' ? 'active' : ''}`} 
             width={boardPx} 
             height={boardPx} 
             onMouseDown={startDrawing} 
