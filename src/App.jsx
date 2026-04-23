@@ -5,6 +5,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Peer from 'peerjs';
 
+import { stoneAudioB64 } from './audioBase64';
+
 const BOARD_SIZE = 19;
 
 // Mock Courses Data
@@ -47,6 +49,20 @@ const App = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTeacher, setIsTeacher] = useState(true); // Default to teacher
   const [canStudentPlay, setCanStudentPlay] = useState(false);
+  const [customAudioData, setCustomAudioData] = useState(() => localStorage.getItem('classgo_diy_sound'));
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Use the base64 data, exactly mimicking the working logic from the old HTML file.
+  const playStoneSound = () => {
+    if (!soundEnabled) return;
+    const audioData = customAudioData || stoneAudioB64;
+    if (audioData) {
+      const a = new Audio(audioData);
+      a.currentTime = 0;
+      a.volume = 0.6;
+      a.play().catch(e => console.log("Audio play error:", e));
+    }
+  };
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -55,7 +71,6 @@ const App = () => {
   const recordedChunksRef = useRef([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState(null);
-  const stoneAudioRef = useRef(new Audio('/落子音.m4a'));
   const [selectedCourse, setSelectedCourse] = useState(null);
 
   // Resize Handler
@@ -335,19 +350,6 @@ const App = () => {
     return liberties;
   };
 
-  const playStoneSound = () => {
-    // 每次落子创建一个新的音效实例，避免状态冲突
-    const audio = new Audio('/落子音.m4a');
-    audio.volume = 0.6;
-    audio.play().catch(() => {});
-    
-    // 0.5秒后切断该实例
-    setTimeout(() => {
-      audio.pause();
-      audio.remove(); // 释放资源
-    }, 500);
-  };
-
   const lastInteractTime = useRef(0);
 
   const handleBoardInteraction = (e) => {
@@ -357,8 +359,8 @@ const App = () => {
     lastInteractTime.current = now;
 
     // Pointer events handle both mouse and touch in a unified way.
-    // We want to allow left click (0) and middle click (1).
-    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+    // Allow left click (0), middle click (1), and right click (2) for setup mode
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
     
     // Check permissions
     if (!isTeacher && !canStudentPlay) {
@@ -415,18 +417,40 @@ const App = () => {
     }
 
     // Logic for Stones
-    if (activeTool === 'stone') {
+    if (['stone', 'stone-setup'].includes(activeTool)) {
       if (stones.has(key)) {
-        // Optional: Toggle stones off if teacher? (For now just return)
+        if (activeTool === 'stone-setup') {
+          // Edit mode: click on existing stone to remove it
+          const newStones = new Map(stones);
+          newStones.delete(key);
+          setStones(newStones);
+          playStoneSound();
+          sendData({ 
+            type: 'SYNC', 
+            stones: JSON.stringify(Array.from(newStones.entries())), 
+            turn: currentTurn,
+            moveCount: moveCount,
+            annotations: annotations
+          });
+        }
         return;
+      }
+
+      let colorToPlay = currentTurn;
+      if (activeTool === 'stone-setup') {
+        if (e.pointerType === 'mouse') {
+          colorToPlay = e.button === 2 ? 'white' : 'black'; // Right click white, left click black
+        } else {
+          colorToPlay = 'black'; // Fallback for touch
+        }
       }
 
       const newStones = new Map(stones);
       const moveNum = moveCount + 1;
-      newStones.set(key, { color: currentTurn, moveNumber: moveNum });
+      newStones.set(key, { color: colorToPlay, moveNumber: moveNum });
 
       // Captures
-      const opponent = currentTurn === 'black' ? 'white' : 'black';
+      const opponent = colorToPlay === 'black' ? 'white' : 'black';
       let capturedCount = 0;
       getNeighbors(x, y).forEach(([nx, ny]) => {
         const nk = `${nx},${ny}`;
@@ -440,7 +464,7 @@ const App = () => {
       });
 
       // Suicide check
-      const selfGroup = getGroup(x, y, currentTurn, newStones);
+      const selfGroup = getGroup(x, y, colorToPlay, newStones);
       if (getLiberties(selfGroup, newStones).size === 0 && capturedCount === 0) {
         alert("禁止自杀！");
         return;
@@ -448,16 +472,30 @@ const App = () => {
 
       playStoneSound();
       setStones(newStones);
-      setMoveCount(moveNum);
-      const nextTurn = currentTurn === 'black' ? 'white' : 'black';
-      setCurrentTurn(nextTurn);
-
-      sendData({ 
-        type: 'MOVE', 
-        stones: JSON.stringify(Array.from(newStones.entries())), 
-        turn: nextTurn,
-        moveCount: moveNum
-      });
+      
+      // Only advance turn and history if in normal play mode
+      let nextTurn = currentTurn;
+      if (activeTool === 'stone') {
+        setMoveCount(moveNum);
+        nextTurn = currentTurn === 'black' ? 'white' : 'black';
+        setCurrentTurn(nextTurn);
+        
+        sendData({ 
+          type: 'MOVE', 
+          stones: JSON.stringify(Array.from(newStones.entries())), 
+          turn: nextTurn,
+          moveCount: moveNum
+        });
+      } else {
+        // Setup mode just syncs the board state without advancing turns
+        sendData({ 
+          type: 'SYNC', 
+          stones: JSON.stringify(Array.from(newStones.entries())), 
+          turn: currentTurn,
+          moveCount: moveCount,
+          annotations: annotations
+        });
+      }
     }
   };
 
@@ -684,6 +722,7 @@ const App = () => {
           ref={boardRef}
           className="go-board-wrapper" 
           onPointerDown={handleBoardInteraction}
+          onContextMenu={(e) => e.preventDefault()}
           style={{ width: boardPx, height: boardPx, '--cell-size': `${cellSize}px`, position: 'relative' }}
         >
           {showCoords && Array.from({length: 19}).map((_, i) => (
@@ -847,7 +886,8 @@ const App = () => {
             <div className="tool-group">
               <span className="tool-label">工具箱</span>
               <div className="tool-grid">
-                <button className={`tool-button ${activeTool === 'stone' ? 'active' : ''}`} onClick={() => setActiveTool('stone')}><Hand size={20}/></button>
+                <button className={`tool-button ${activeTool === 'stone' ? 'active' : ''}`} onClick={() => setActiveTool('stone')} title="交替落子"><span style={{fontSize: '18px'}}>☯</span></button>
+                <button className={`tool-button ${activeTool === 'stone-setup' ? 'active' : ''}`} onClick={() => setActiveTool('stone-setup')} title="摆子模式 (左黑右白)"><div style={{width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg, black 50%, white 50%)', border: '1px solid #666'}}/></button>
                 <button className={`tool-button ${activeTool === 'pen' ? 'active' : ''}`} onClick={() => setActiveTool('pen')}><Pencil size={20}/></button>
                 <button className={`tool-button ${activeTool === 'circle' ? 'active' : ''}`} onClick={() => setActiveTool('circle')}><Circle size={20}/></button>
                 <button className={`tool-button ${activeTool === 'triangle' ? 'active' : ''}`} onClick={() => setActiveTool('triangle')}><Triangle size={20}/></button>
@@ -873,6 +913,65 @@ const App = () => {
                     }}
                   />
                 ))}
+              </div>
+            </div>
+            
+            <div className="tool-group">
+              <span className="tool-label">音效设置</span>
+              <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
+                <button 
+                  className={`tool-button ${soundEnabled ? 'active' : ''}`} 
+                  style={{flex: 1, flexDirection: 'row', gap: 6, padding: '8px'}}
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                >
+                  <span style={{fontSize: '14px'}}>{soundEnabled ? '🔊 开启' : '🔇 关闭'}</span>
+                </button>
+                <button 
+                  className="tool-button" 
+                  style={{flex: 1, flexDirection: 'row', gap: 6, padding: '8px'}}
+                  onClick={() => document.getElementById('sound-upload').click()}
+                >
+                  <span style={{fontSize: '14px'}}>📂 自定义</span>
+                </button>
+                <input 
+                  type="file" 
+                  id="sound-upload" 
+                  accept="audio/*" 
+                  style={{display: 'none'}} 
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) {
+                      alert("音频文件过大，请保持在2MB以内");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const b64 = ev.target.result;
+                      setCustomAudioData(b64);
+                      localStorage.setItem('classgo_diy_sound', b64);
+                      const a = new Audio(b64);
+                      a.play().catch(()=>{});
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = ''; // Reset input
+                  }} 
+                />
+                {customAudioData && (
+                  <button 
+                    className="tool-button" 
+                    style={{padding: '8px 12px', background: 'rgba(255, 77, 79, 0.1)', color: '#ff4d4f'}} 
+                    title="恢复默认音效"
+                    onClick={() => {
+                      if(window.confirm('清除自定义音效？')){
+                        setCustomAudioData(null);
+                        localStorage.removeItem('classgo_diy_sound');
+                      }
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
             
